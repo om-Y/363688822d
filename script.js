@@ -327,11 +327,9 @@ function initAlmathkoraApp() {
                     targetProd.isOutOfStock = !targetProd.isOutOfStock;
                     localStorage.setItem('almathkora_products', JSON.stringify(products));
 
-                    if (isLocalServerActive) {
-                        fetch('/api/sync-products', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ allProducts: products })
+                    if (isFirebaseActive && firebaseDb) {
+                        firebaseDb.collection('products').doc(id).update({
+                            isOutOfStock: targetProd.isOutOfStock
                         }).catch(e => console.error(e));
                     }
 
@@ -859,61 +857,145 @@ function initAlmathkoraApp() {
     }
 
     // ==========================================
-    // LOCAL SERVER DETECTION (DIRECT DISK SAVE)
+    // GOOGLE FIREBASE CLOUD & REAL-TIME SYNC
     // ==========================================
-    let isLocalServerActive = false;
+    let firebaseDb = null;
+    let isFirebaseActive = false;
+    let firebaseUnsubscribe = null;
+
     const addProdDiskStatusBanner = document.getElementById('addProdDiskStatusBanner');
 
-    async function checkLocalServerStatus() {
-        if (window.location.protocol === 'file:') {
-            isLocalServerActive = false;
-            if (addProdDiskStatusBanner) {
-                addProdDiskStatusBanner.className = 'disk-status-banner connected';
-                addProdDiskStatusBanner.innerHTML = `
-                    <i class="fa-solid fa-folder-open"></i>
-                    <div>
-                        <strong>الموقع يعمل بنجاح ومباشرة من جهازك ✨</strong>
-                        <span>عند إضافة أو تعديل المنتجات، يمكنك تحميل ملف <code>products.js</code> بنقرة واحدة من تبويب (إدارة المنتجات) لرفعه مع موقعك إلى GitHub.</span>
-                    </div>
-                `;
-            }
-            return false;
-        }
+    function updateFirebaseUIStatus(connected, errorMsg = '') {
+        const banner = document.getElementById('firebaseLiveStatusBanner');
+        const title = document.getElementById('firebaseStatusTitle');
+        const desc = document.getElementById('firebaseStatusDesc');
+        const disconnectBtn = document.getElementById('disconnectFirebaseBtn');
 
-        try {
-            const res = await fetch('/api/status', { cache: 'no-store' });
-            if (res.ok) {
-                isLocalServerActive = true;
-                if (addProdDiskStatusBanner) {
-                    addProdDiskStatusBanner.className = 'disk-status-banner connected';
-                    addProdDiskStatusBanner.innerHTML = `
-                        <i class="fa-solid fa-circle-check"></i>
-                        <div>
-                            <strong>الحفظ المباشر في ملفات جهازك مفعل 🟢</strong>
-                            <span>أي منتج أو صورة تضيفها الآن ستُحفظ فوراً في مجلد <code>images/</code> ويتم تحديث ملف <code>products.js</code> على جهازك تلقائياً!</span>
-                        </div>
-                    `;
-                }
-                return true;
+        if (connected) {
+            if (banner) {
+                banner.className = 'firebase-status-card connected';
+                if (title) title.innerHTML = 'حالة السحاب: متصل بنجاح 🟢 (الحفظ السحابي المباشر مفعل)';
+                if (desc) desc.textContent = 'أي منتج تضيفه أو تعدله أو تحذفه الآن يُحفظ مباشرة في سحاب Google ويشاهده جميع الزوار فوراً وبشكل تلقائي دون الحاجة لـ GitHub!';
             }
-        } catch (e) {
-            isLocalServerActive = false;
+            if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
+
+            if (addProdDiskStatusBanner) {
+                addProdDiskStatusBanner.className = 'disk-status-banner connected';
+                addProdDiskStatusBanner.innerHTML = `
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <div>
+                        <strong>سحاب Google Firebase مفعل 🟢</strong>
+                        <span>أي منتج أو صورة تضيفها الآن ستُنقل وتُحفظ فوراً في سحاب Google ويشاهدها جميع الزوار تلقائياً!</span>
+                    </div>
+                `;
+            }
+        } else {
+            if (banner) {
+                banner.className = 'firebase-status-card not-connected';
+                if (title) title.innerHTML = 'حالة السحاب: غير متصل (يعمل محلياً) 🟡';
+                if (desc) desc.textContent = errorMsg
+                    ? `تنبيه الاتصال: (${errorMsg}). تأكد من إعدادات قواعد Firestore في وضع الاختبار.`
+                    : 'التعديلات تنحفظ حالياً داخل متصفحك وجهازك. لربط سحاب Google Firebase للحفظ التلقائي المباشر، اتبع الخطوات السهلة أدناه.';
+            }
+            if (disconnectBtn) disconnectBtn.style.display = 'none';
+
             if (addProdDiskStatusBanner) {
                 addProdDiskStatusBanner.className = 'disk-status-banner connected';
                 addProdDiskStatusBanner.innerHTML = `
                     <i class="fa-solid fa-folder-open"></i>
                     <div>
                         <strong>الموقع يعمل بنجاح ومباشرة من جهازك ✨</strong>
-                        <span>عند إضافة أو تعديل المنتجات، يمكنك تحميل ملف <code>products.js</code> بنقرة واحدة من تبويب (إدارة المنتجات) لرفعه مع موقعك إلى GitHub.</span>
+                        <span>عند إضافة أو تعديل المنتجات، يمكنك تحميل ملف <code>products.js</code> بنقرة واحدة من تبويب (إدارة المنتجات) لرفعه مع موقعك إلى GitHub. أو فعّل سحاب Firebase للحفظ التلقائي!</span>
                     </div>
                 `;
             }
-            return false;
         }
     }
 
+    async function seedInitialProductsToFirebase(db) {
+        try {
+            const batch = db.batch();
+            initialDefaultProducts.forEach((p, idx) => {
+                const docRef = db.collection('products').doc(p.id);
+                batch.set(docRef, {
+                    id: p.id,
+                    name: p.name,
+                    price: p.price,
+                    description: p.description || '',
+                    image: p.image,
+                    isOutOfStock: Boolean(p.isOutOfStock),
+                    createdAt: Date.now() - (idx * 1000)
+                });
+            });
+            await batch.commit();
+            console.log('Default products seeded to Firebase successfully.');
+        } catch (e) {
+            console.error('Error seeding default products to Firebase:', e);
+        }
+    }
 
-    checkLocalServerStatus();
+    function initFirebaseSystem() {
+        if (typeof firebase === 'undefined' || !firebase.initializeApp) {
+            updateFirebaseUIStatus(false);
+            return;
+        }
+
+        const config = getActiveFirebaseConfig();
+        if (!isFirebaseConfigured(config)) {
+            updateFirebaseUIStatus(false);
+            return;
+        }
+
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(config);
+            }
+            firebaseDb = firebase.firestore();
+            isFirebaseActive = true;
+            updateFirebaseUIStatus(true);
+
+            if (firebaseUnsubscribe) {
+                firebaseUnsubscribe();
+            }
+
+            // Real-time updates listener for products
+            firebaseUnsubscribe = firebaseDb.collection('products').onSnapshot(async (snapshot) => {
+                if (snapshot.empty) {
+                    await seedInitialProductsToFirebase(firebaseDb);
+                } else {
+                    const fbList = [];
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        fbList.push({
+                            id: doc.id,
+                            name: data.name || '',
+                            price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
+                            description: data.description || '',
+                            image: data.image || 'logo.jpg',
+                            isOutOfStock: Boolean(data.isOutOfStock),
+                            createdAt: data.createdAt || 0
+                        });
+                    });
+                    fbList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    products = fbList;
+                    try {
+                        localStorage.setItem('almathkora_products', JSON.stringify(products));
+                    } catch (e) {}
+                    renderProducts();
+                    renderAdminProducts();
+                }
+            }, (error) => {
+                console.warn('Firestore subscription error:', error);
+                updateFirebaseUIStatus(false, error.message);
+            });
+        } catch (err) {
+            console.error('Firebase setup error:', err);
+            isFirebaseActive = false;
+            updateFirebaseUIStatus(false, err.message);
+        }
+    }
+
+    initFirebaseSystem();
 
     if (addProductForm) {
         addProductForm.addEventListener('submit', async (e) => {
@@ -941,27 +1023,16 @@ function initAlmathkoraApp() {
             const saveProductBtn = document.getElementById('saveProductBtn');
             const originalBtnHtml = saveProductBtn ? saveProductBtn.innerHTML : '';
 
-            // إذا كان الخادم المحلي يعمل، احفظ الصورة في مجلد images/ وحدث products.js مباشرة على القرص
-            if (isLocalServerActive) {
-                if (saveProductBtn) saveProductBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري حفظ الصورة في مجلد images/ والملفات...';
+            // إذا كان سحاب Firebase مفعلاً، احفظ المنتج مباشرة في سحاب Google
+            if (isFirebaseActive && firebaseDb) {
+                if (saveProductBtn) saveProductBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الحفظ في سحاب Google...';
                 try {
-                    const payload = {
-                        product: newProduct,
-                        allProducts: [newProduct, ...products],
-                        imageBase64: currentNewProductImageData && currentNewProductImageData.startsWith('data:image') ? currentNewProductImageData : ''
-                    };
-                    const res = await fetch('/api/save-product', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const resData = await res.json();
-                    if (resData.success && resData.product) {
-                        newProduct.image = resData.product.image; // مسار الصورة الحقيقي مثل: images/prod_123.jpg
-                    }
-                    showToast(`✅ تم حفظ الصورة في مجلد images/ وتحديث ملف products.js في جهازك بنجاح!`, 'gold');
+                    newProduct.createdAt = Date.now();
+                    await firebaseDb.collection('products').doc(newProduct.id).set(newProduct);
+                    showToast(`☁️ تم حفظ "${name}" في سحاب Google وظهر لجميع الزوار فوراً!`, 'gold');
                 } catch (err) {
-                    console.error('Local save error:', err);
+                    console.error('Firebase save error:', err);
+                    showToast(`تعذر الحفظ في السحاب (${err.message})`, 'error');
                 } finally {
                     if (saveProductBtn) saveProductBtn.innerHTML = originalBtnHtml;
                 }
@@ -1088,17 +1159,13 @@ function initAlmathkoraApp() {
                 updateCartUI();
             }
 
-            // إذا كان الخادم المحلي يعمل، حدّث ملف products.js مباشرة على القرص
-            if (isLocalServerActive) {
+            // إذا كان سحاب Firebase مفعلاً، حدّث المنتج مباشرة في سحاب Google
+            if (isFirebaseActive && firebaseDb) {
                 try {
-                    await fetch('/api/sync-products', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ allProducts: products })
-                    });
-                    showToast(`✅ تم تحديث ملف products.js في جهازك مباشرة!`, 'gold');
+                    await firebaseDb.collection('products').doc(id).set(targetProd, { merge: true });
+                    showToast(`☁️ تم تحديث "${name}" في سحاب Google بنجاح!`, 'gold');
                 } catch (e) {
-                    console.error('Disk sync error:', e);
+                    console.error('Firebase edit error:', e);
                 }
             }
 
@@ -1156,13 +1223,14 @@ function initAlmathkoraApp() {
                 renderProducts();
                 renderAdminProducts();
 
-                // إذا كان الخادم المحلي يعمل، حدّث ملف products.js مباشرة على القرص
-                if (isLocalServerActive) {
-                    fetch('/api/sync-products', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ allProducts: products })
-                    }).catch(e => console.error(e));
+                // إذا كان سحاب Firebase مفعلاً، احذف المنتج من سحاب Google
+                if (isFirebaseActive && firebaseDb) {
+                    try {
+                        firebaseDb.collection('products').doc(prodIdToDelete).delete().catch(e => console.error(e));
+                        showToast(`☁️ تم حذف "${prodName}" من سحاب Google نهائياً`, 'info');
+                    } catch (err) {
+                        console.error('Firebase delete error:', err);
+                    }
                 }
 
                 deleteConfirmModal.classList.remove('active');
@@ -1247,6 +1315,86 @@ function initAlmathkoraApp() {
             localStorage.setItem('almathkora_google_client_id', clientId);
             showToast('تم حفظ معرف عميل Google بنجاح!', 'success');
             initGoogleIdentityServices();
+        });
+    }
+
+    // Firebase Cloud Config Form
+    const firebaseConfigForm = document.getElementById('firebaseConfigForm');
+    const firebaseConfigJson = document.getElementById('firebaseConfigJson');
+    const disconnectFirebaseBtn = document.getElementById('disconnectFirebaseBtn');
+
+    if (firebaseConfigJson) {
+        try {
+            const savedFb = localStorage.getItem('almathkora_firebase_config');
+            if (savedFb) {
+                firebaseConfigJson.value = JSON.stringify(JSON.parse(savedFb), null, 2);
+            }
+        } catch (e) {}
+    }
+
+    if (firebaseConfigForm) {
+        firebaseConfigForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const raw = firebaseConfigJson.value.trim();
+            if (!raw) {
+                alert('الرجاء لصق كود firebaseConfig أولاً.');
+                return;
+            }
+
+            let parsedConfig = null;
+            try {
+                parsedConfig = JSON.parse(raw);
+            } catch (err) {
+                try {
+                    const extract = (key) => {
+                        const match = raw.match(new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`));
+                        return match ? match[1] : '';
+                    };
+                    parsedConfig = {
+                        apiKey: extract('apiKey'),
+                        authDomain: extract('authDomain'),
+                        projectId: extract('projectId'),
+                        storageBucket: extract('storageBucket'),
+                        messagingSenderId: extract('messagingSenderId'),
+                        appId: extract('appId')
+                    };
+                } catch (e2) {
+                    parsedConfig = null;
+                }
+            }
+
+            if (!parsedConfig || !parsedConfig.projectId || !parsedConfig.apiKey) {
+                alert('تعذر قراءة الكود! تأكد من نسخ كود firebaseConfig بالكامل كما هو من موقع Firebase.');
+                return;
+            }
+
+            try {
+                localStorage.setItem('almathkora_firebase_config', JSON.stringify(parsedConfig));
+                showToast('تم حفظ إعدادات Firebase بنجاح! جاري الاتصال بالسحاب... ☁️', 'gold');
+                initFirebaseSystem();
+            } catch (err) {
+                alert('حدث خطأ أثناء حفظ الإعدادات: ' + err.message);
+            }
+        });
+    }
+
+    if (disconnectFirebaseBtn) {
+        disconnectFirebaseBtn.addEventListener('click', () => {
+            if (confirm('هل أنت متأكد من رغبتك في إلغاء ربط سحاب Firebase والعودة للوضع المحلي؟')) {
+                localStorage.removeItem('almathkora_firebase_config');
+                if (firebaseConfigJson) firebaseConfigJson.value = '';
+                if (firebaseUnsubscribe) {
+                    firebaseUnsubscribe();
+                    firebaseUnsubscribe = null;
+                }
+                isFirebaseActive = false;
+                firebaseDb = null;
+                products = loadStoredProducts();
+                renderProducts();
+                renderAdminProducts();
+                updateFirebaseUIStatus(false);
+                showToast('تم إلغاء ربط Firebase والعودة للنظام المحلي بنجاح', 'info');
+            }
         });
     }
 

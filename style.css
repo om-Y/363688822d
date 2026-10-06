@@ -2147,6 +2147,126 @@ footer {
     font-weight: bold;
 }
 
+/* ===================================================
+   GOOGLE FIREBASE CLOUD SYNC STYLES
+=================================================== */
+.firebase-status-card {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    padding: 1.2rem 1.4rem;
+    border-radius: 14px;
+    margin-bottom: 1.5rem;
+    transition: var(--transition);
+}
+
+.firebase-status-card.connected {
+    background: rgba(46, 204, 113, 0.12);
+    border: 1px solid rgba(46, 204, 113, 0.4);
+    box-shadow: 0 4px 20px rgba(46, 204, 113, 0.15);
+}
+
+.firebase-status-card.not-connected {
+    background: rgba(243, 156, 18, 0.12);
+    border: 1px solid rgba(243, 156, 18, 0.4);
+}
+
+.firebase-status-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px currentColor;
+}
+
+.firebase-status-card.connected .firebase-status-dot {
+    background-color: #2ECC71;
+    color: #2ECC71;
+    animation: pulseDot 2s infinite;
+}
+
+.firebase-status-card.not-connected .firebase-status-dot {
+    background-color: #F39C12;
+    color: #F39C12;
+}
+
+@keyframes pulseDot {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
+
+.firebase-status-text strong {
+    font-size: 1.05rem;
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.firebase-status-card.connected .firebase-status-text strong {
+    color: #2ECC71;
+}
+
+.firebase-status-card.not-connected .firebase-status-text strong {
+    color: #F39C12;
+}
+
+.firebase-status-text p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.firebase-action-btns {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.firebase-guide-box {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+}
+
+.firebase-guide-box h5 {
+    font-size: 1.1rem;
+    color: var(--text-main);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.firebase-guide-box ol {
+    padding-right: 1.4rem;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.8;
+}
+
+.firebase-guide-box ol li {
+    margin-bottom: 0.6rem;
+}
+
+.firebase-guide-box ol li code {
+    background: rgba(212, 175, 55, 0.15);
+    color: var(--primary-color);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+}
+
+.firebase-guide-box .guide-note {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+
 
 
 

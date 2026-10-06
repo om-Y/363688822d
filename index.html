@@ -240,6 +240,10 @@
                     <i class="fa-brands fa-google"></i>
                     <span>تسجيل Google</span>
                 </button>
+                <button type="button" class="settings-tab-btn" data-tab="tabFirebase">
+                    <i class="fa-solid fa-cloud"></i>
+                    <span>سحاب Google Firebase ☁️</span>
+                </button>
             </div>
 
             <div class="settings-modal-body">
@@ -423,6 +427,64 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- TAB 5: GOOGLE FIREBASE CLOUD SYNC -->
+                <div class="settings-tab-content" id="tabFirebase">
+                    <div class="security-box">
+                        <div class="security-box-header">
+                            <i class="fa-solid fa-cloud gold-icon"></i>
+                            <div>
+                                <h4>الربط المباشر بسحاب Google Firebase</h4>
+                                <p>حفظ المنتجات والأسعار والصور تلقائياً في سحاب جوجل ليراها كل الزوار فوراً وبدون لمس GitHub نهائياً!</p>
+                            </div>
+                        </div>
+
+                        <!-- Live Status Banner -->
+                        <div id="firebaseLiveStatusBanner" class="firebase-status-card not-connected">
+                            <div class="firebase-status-dot"></div>
+                            <div class="firebase-status-text">
+                                <strong id="firebaseStatusTitle">حالة السحاب: غير متصل (يعمل بالنظام المحلي) 🟡</strong>
+                                <p id="firebaseStatusDesc">التعديلات تنحفظ حالياً داخل متصفحك وجهازك. لربط سحاب Google Firebase للحفظ التلقائي المباشر، اتبع الخطوات السهلة أدناه.</p>
+                            </div>
+                        </div>
+
+                        <form id="firebaseConfigForm">
+                            <div class="form-group">
+                                <label for="firebaseConfigJson">كود إعدادات Firebase (firebaseConfig)</label>
+                                <textarea id="firebaseConfigJson" rows="6" placeholder="الصق كود firebaseConfig هنا مباشرة، مثال:
+{
+  &quot;apiKey&quot;: &quot;AIzaSy...&quot;,
+  &quot;authDomain&quot;: &quot;your-app.firebaseapp.com&quot;,
+  &quot;projectId&quot;: &quot;your-app&quot;,
+  &quot;storageBucket&quot;: &quot;your-app.appspot.com&quot;,
+  &quot;messagingSenderId&quot;: &quot;123456789&quot;,
+  &quot;appId&quot;: &quot;1:1234:web:abcd&quot;
+}"></textarea>
+                                <div class="password-hint">يمكنك نسخ الكود كما هو من موقع Firebase ولصقه هنا، وسيقوم المتجر بالاتصال تلقائياً!</div>
+                            </div>
+                            <div class="firebase-action-btns">
+                                <button type="submit" class="btn-primary-action">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> حفظ وتفعيل سحاب Firebase 🚀
+                                </button>
+                                <button type="button" id="disconnectFirebaseBtn" class="btn-cancel" style="display: none;">
+                                    <i class="fa-solid fa-power-off"></i> إلغاء الربط والرجوع للنظام المحلي
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Step-by-step simple instructions -->
+                        <div class="firebase-guide-box">
+                            <h5><i class="fa-solid fa-graduation-cap gold-icon"></i> كيف تحصل على كود Firebase المجاني في دقيقتين؟</h5>
+                            <ol>
+                                <li>افتح موقع <strong><a href="https://console.firebase.google.com" target="_blank" style="color: var(--primary-color); text-decoration: underline;">console.firebase.google.com</a></strong> وسجل بحساب Google الخاص بك.</li>
+                                <li>اضغط على <strong>Create a project</strong> (إنشاء مشروع) واكتب أي اسم تحبه (مثلاً: <code>almathkora</code>).</li>
+                                <li>من القائمة الجانبية اضغط <strong>Build</strong> ثم <strong>Firestore Database</strong> واضغط <strong>Create database</strong> (اختر Start in test mode).</li>
+                                <li>اضغط على علامة الترس ⚙️ (Project settings) بجانب كلمة Project Overview، وانزل لأسفل واضغط على أيقونة الويب <strong><code>&lt;/&gt;</code></strong>، سيعطيك كود <code>firebaseConfig</code> انسخه والصقه في المربع أعلاه واضغط حفظ!</li>
+                            </ol>
+                            <p class="guide-note">💡 أو يمكنك إرسال المفاتيح لي هنا في المحادثة وسأقوم بتركيبها لك في ملفات الموقع فوراً!</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -577,6 +639,11 @@
 
     <!-- Floating Toast Notification System -->
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Google Firebase Cloud SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
 
     <script src="products.js"></script>
     <script src="script.js"></script>
